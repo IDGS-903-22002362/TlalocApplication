@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "438299482068",
+    "project_id": "tlalocs-aae0b",
+    "storage_bucket": "tlalocs-aae0b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:438299482068:android:aa2829402442525e1ce841",
+        "android_client_info": {
+          "package_name": "com.lrosas.tlalocapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCDYhevjeX1QkGjBFw7z3PctcuVo0LCS08"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
