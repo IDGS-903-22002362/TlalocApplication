@@ -8,13 +8,23 @@ import kotlinx.coroutines.flow.*
 object SensorRepository {
 
     /* --------------------- parámetros de calibración --------------------- */
-    /** ADC con la sonda al aire (100 % seco)            */
+    /** ADC con la sonda al aire (100 % seco).            */
     var VALOR_SECO   = 3400
-    /** ADC sumergido / sustrato saturado (0 % seco)     */
+    /** ADC sumergido / sustrato saturado (0 % seco).     */
     var VALOR_HUMEDO = 1700
 
     /* --------------------------- topic base ----------------------------- */
     private const val TOPIC_BASE = "tlaloc"
+
+    /* ------------------ depuración: log de cada mensaje ----------------- */
+    init {
+        // Lanza una corrutina en segundo plano que imprime todo lo que llega
+        HiveMqManager.incoming
+            .onEach { (topic, msg) ->
+                println("DEBUG-MQTT ➜ $topic -> $msg")
+            }
+            .launchIn(CoroutineScope(Dispatchers.IO))
+    }
 
     /* -------------------- flujo crudo (topic → payload) ------------------ */
     private val raw: Flow<Pair<String, String>> =
@@ -25,45 +35,43 @@ object SensorRepository {
 
     /** Luxómetro (lx) */
     val luxFlow: Flow<Float> = raw
-        .filter { (t, _) -> t.endsWith("/lux") }
-        .map { (_, msg) -> msg.toFloatOrNull() ?: 0f }
+        .filter { it.first.endsWith("/lux") }
+        .map   { (_, msg) -> msg.toFloatOrNull() ?: 0f }
 
-    /** Humedad en % – regla de tres con valores de calibración */
-    val humFlow: Flow<Int> = raw
-        .filter { (t, _) -> t.endsWith("/humidity") }
-        .map { (_, msg) ->
-            val adc = msg.toIntOrNull() ?: 0
-            val pct = (100f * (VALOR_SECO - adc) / (VALOR_SECO - VALOR_HUMEDO))
+    /* --- humedad --- */
+    val humAdcFlow: Flow<Int> = raw
+        .filter { it.first.endsWith("/humidity") }
+        .map   { (_, msg) -> msg.toIntOrNull() ?: 0 }
+
+    /** Humedad en % (0-100) a partir del ADC crudo y la calibración. */
+    val humFlow: Flow<Int> = humAdcFlow
+        .map { adc ->
+            val pct = 100f * (VALOR_SECO - adc) / (VALOR_SECO - VALOR_HUMEDO)
             pct.coerceIn(0f, 100f).toInt()
         }
-    /* ------------- valor crudo de humedad (ADC 0-4095) ------------- */
-    val humAdcFlow: Flow<Int> = raw
-        // el ESP32 debe publicar  tlaloc/tele/zone1/humidityRaw   2840
-        .filter { (t, _) -> t.endsWith("/humidityRaw") }
-        .map { (_, msg) -> msg.toIntOrNull() ?: 0 }
 
     /** TDS / EC (ppm) */
     val tdsFlow: Flow<Float> = raw
-        .filter { (t, _) -> t.endsWith("/tds") }
-        .map { (_, msg) -> msg.toFloatOrNull() ?: 0f }
+        .filter { it.first.endsWith("/tds") }
+        .map   { (_, msg) -> msg.toFloatOrNull() ?: 0f }
 
-    /** Distancia (cm) del ultrasónico */
+    /** Distancia (cm) medida por el ultrasónico */
     val distFlow: Flow<Float> = raw
-        .filter { (t, _) -> t.endsWith("/distance") }
-        .map { (_, msg) -> msg.toFloatOrNull() ?: -1f }
+        .filter { it.first.endsWith("/distance") }
+        .map   { (_, msg) -> msg.toFloatOrNull() ?: -1f }
 
     /* ------------------------ envío de comandos ------------------------- */
 
     /**
      * Envía un comando genérico:
-     *  - zoneId  →  “zone1”, “zone2”…
-     *  - key     →  “pump”, “led”, “stream” …
-     *  - value   →  “ON”, “OFF”, “5” …
+     *   zoneId → “zone1”, “zone2”…
+     *   key    → “pump”, “led”, “stream”…
+     *   value  → “ON”, “OFF”, “5”…
      */
     fun sendCommand(zoneId: String, key: String, value: String) =
         HiveMqManager.publishCmd(zoneId, key, value)
 
-    /** Atajo específico para encender / apagar la bomba */
+    /** Atajo para encender / apagar la bomba */
     fun setPump(zoneId: String, on: Boolean) =
         sendCommand(zoneId, "pump", if (on) "ON" else "OFF")
 
@@ -72,6 +80,6 @@ object SensorRepository {
     suspend fun updateCalibration(seco: Int, humedo: Int) {
         VALOR_SECO   = seco
         VALOR_HUMEDO = humedo
-        // TODO: persistir en DataStore si deseas que sobreviva a reinicios
+        // TODO: guardar en DataStore si quieres conservar tras reinicios
     }
 }

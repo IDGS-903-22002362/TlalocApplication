@@ -27,6 +27,8 @@ object HiveMqManager {
 
     /* ----------------------------- construcción cliente -------------------------------- */
     private var client: Mqtt3AsyncClient = buildClient()
+    private val _errors = MutableSharedFlow<Throwable>(extraBufferCapacity = 4)
+    val errors = _errors.asSharedFlow()
 
     private fun buildClient(): Mqtt3AsyncClient =
         MqttClient.builder()
@@ -78,18 +80,39 @@ object HiveMqManager {
 
     /* ---------------------------------- privados -------------------------------------- */
     private fun subscribeToTelemetry() {
+
+        // Suscripción “tradicional” (API builder) – solo tópicos de telemetría
         client.subscribeWith()
-            .topicFilter("$TOPIC_BASE/tele/#")
-            .qos(MqttQos.AT_LEAST_ONCE)
+            .topicFilter("$TOPIC_BASE/tele/#")               // tlaloc/tele/zone1/…
+            .callback { pub ->
+                try {
+                    val buf = pub.payload.orElse(null) ?: return@callback
+                    val bytes = ByteArray(buf.remaining())   // buffer de sólo-lectura ⇒ copiamos
+                    buf.get(bytes)
+                    val msg = String(bytes, Charsets.UTF_8)
+
+                    _incoming.tryEmit(pub.topic.toString() to msg)
+
+                } catch (e: Exception) {
+                    _errors.tryEmit(e)                       // Flow<Throwable> para log/debug
+                }
+            }
             .send()
 
-        client.publishes(MqttGlobalPublishFilter.ALL) { pub: Mqtt3Publish ->
-            val payload = pub.payload.map(ByteBuffer::remaining).orElse(0).let { len ->
-                val bytes = ByteArray(len)
-                pub.payload.get().get(bytes)
-                String(bytes, Charsets.UTF_8)
+        // Suscripción global – solo si quieres capturar TODO lo que llegue
+        // (mantener una sola de las dos basta; deja ésta si prefieres un solo registro)
+        client.publishes(MqttGlobalPublishFilter.ALL) { pub ->
+            try {
+                val buf = pub.payload.orElse(null) ?: return@publishes
+                val bytes = ByteArray(buf.remaining()).also { buf.get(it) }
+                val msg   = bytes.toString(Charsets.UTF_8)
+
+                _incoming.tryEmit(pub.topic.toString() to msg)
+
+            } catch (e: Exception) {
+                _errors.tryEmit(e)
             }
-            _incoming.tryEmit(pub.topic.toString() to payload)
         }
     }
+
 }
