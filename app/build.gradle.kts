@@ -37,35 +37,45 @@ android {
 }
 
 dependencies {
+    /* ---------- Firebase BOM (usa versiones internas) ---------- */
     implementation(platform("com.google.firebase:firebase-bom:34.0.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-database")
+    implementation("com.google.firebase:firebase-firestore") // ya no pongas versión aquí
     implementation("com.google.firebase:firebase-messaging")
+
+    /* ---------- Compose & Navegación ---------- */
     implementation(platform("androidx.compose:compose-bom:2025.07.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.navigation:navigation-compose:2.9.3")
+    implementation("androidx.compose.material:material-icons-extended")
+
     /* ---------- Concurrencia y datos ---------- */
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")  // 1.8.1 May-10-24:contentReference[oaicite:8]{index=8}
-    implementation("androidx.datastore:datastore-preferences:1.1.7")          // estable May-20-25:contentReference[oaicite:9]{index=9}
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
+
     /* ---------- Background ---------- */
-    implementation("androidx.work:work-runtime-ktx:2.10.3")                   // estable Jul-30-25:contentReference[oaicite:11]{index=11}
+    implementation("androidx.work:work-runtime-ktx:2.10.3")
 
     /* ---------- Gráficas ---------- */
-    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")                // última release:contentReference[oaicite:12]{index=12}
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
     /* ---------- Cámaras / QR ---------- */
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")            // 4.3.0 docs:contentReference[oaicite:13]{index=13}
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     /* ---------- MQTT (opcional) ---------- */
-    implementation("com.hivemq:hivemq-mqtt-client:1.3.7")                     // 1.3.7 Jun-11-25:contentReference[oaicite:14]{index=14}
+    implementation("com.hivemq:hivemq-mqtt-client:1.3.7")
 
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation(libs.androidx.activity)
-    implementation(libs.androidx.constraintlayout)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    /* ---------- Android Jetpack básicos ---------- */
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.activity:activity-ktx:1.9.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
+    /* ---------- Test ---------- */
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
