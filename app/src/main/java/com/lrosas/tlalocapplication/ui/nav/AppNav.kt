@@ -58,8 +58,15 @@ fun AppNav(
         /* ---------- Credenciales manuales ---------- */
         composable(Route.Manual.r) {
             ManualBrokerScreen(
-                onSaved = { nav.popBackStack(Route.Test.r, inclusive = false) },
-                onCancel = { nav.popBackStack() }
+                onSaved = {
+                    // → aquí navegamos a Test, borrando Scan y Manual
+                    nav.navigate(Route.Test.r) {
+                        popUpTo(Route.Scan.r) { inclusive = true }
+                    }
+                },
+                onCancel = {
+                    nav.popBackStack()
+                }
             )
         }
 

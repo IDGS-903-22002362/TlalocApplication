@@ -2,15 +2,15 @@ package com.lrosas.tlalocapplication.ui.screen
 
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.lrosas.tlalocapplication.data.store.UserPrefs
@@ -35,16 +35,26 @@ fun QrScanScreen(
         }
     }
 
-    // Abre la cámara al entrar en pantalla
-    SideEffect {
-        launcher.launch(ScanOptions())
-    }
-
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomCenter
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        TextButton(onClick = onManual) {
+        Button(
+            onClick = { launcher.launch(ScanOptions()) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Text("Escanear QR")
+        }
+
+        OutlinedButton(
+            onClick = onManual,
+            modifier = Modifier.fillMaxWidth()
+        ) {
             Text("Introducir manualmente")
         }
     }
