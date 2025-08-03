@@ -1,8 +1,12 @@
 package com.lrosas.tlalocapplication.ui.nav
 
 /* ---------- Compose / Navigation ---------- */
+import android.annotation.SuppressLint
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -22,6 +26,7 @@ import com.lrosas.tlalocapplication.ui.zones.NewZoneScreen
 import com.lrosas.tlalocapplication.ui.zones.ZoneDetailScreen
 import com.lrosas.tlalocapplication.ui.plants.PlantsLibraryScreen
 import com.lrosas.tlalocapplication.ui.plants.NewPlantScreen
+import com.lrosas.tlalocapplication.ui.zones.ZonesViewModel
 
 /* ─────────────── Rutas ─────────────── */
 sealed class Route(val r: String) {
@@ -43,6 +48,7 @@ sealed class Route(val r: String) {
 }
 
 /* ─────────────── NavHost ─────────────── */
+@SuppressLint("UnrememberedGetBackStackEntry")
 @Composable
 fun AppNav(
     startRoute: String,
@@ -106,17 +112,18 @@ fun AppNav(
 
         composable(Route.AddZone.r) {
             NewZoneScreen(
-                onSaved     = { nav.popBackStack() },
-                onPickPlant = { nav.navigate(Route.Plants.r) }
+                navController = nav,                 // único parámetro obligatorio
+                onSaved      = { nav.popBackStack() },
+                onPickPlant  = { nav.navigate(Route.Plants.r) }
             )
         }
 
         composable(Route.Plants.r) {
             PlantsLibraryScreen(
-                onSelect = { plant ->
+                onSelect = { plantId ->                 // ⬅️ 1.  variable es el String id
                     nav.previousBackStackEntry
                         ?.savedStateHandle
-                        ?.set("selectedPlant", plant)
+                        ?.set("selectedPlantId", plantId)   // ⬅️ 2.  guardamos el id directamente
                     nav.popBackStack()
                 },
                 onAdd = { nav.navigate(Route.AddPlant.r) }
@@ -127,9 +134,27 @@ fun AppNav(
             NewPlantScreen(onSaved = { nav.popBackStack() })
         }
 
-        composable(Route.ZoneDetail.r) { back ->
-            val zoneId = back.arguments?.getString("zoneId") ?: return@composable
-            ZoneDetailScreen(zoneId = zoneId, onBack = { nav.popBackStack() })
+        // AppNav.kt  – fragmento de la ruta detalle
+        composable(Route.ZoneDetail.r) { detailEntry ->
+            val zoneId = detailEntry.arguments?.getString("zoneId") ?: return@composable
+
+            /* backEntry “dueño” del ZonesViewModel – recordado para evitar el warning */
+            val zonesBackEntry = remember { nav.getBackStackEntry(Route.Zones.r) }
+
+            /* ViewModel compartido */
+            val zonesVm: ZonesViewModel = viewModel(zonesBackEntry)
+
+            /* Pantalla detalle con el VM compartido */
+            ZoneDetailScreen(
+                zoneId  = zoneId,
+                zonesVm = zonesVm,
+                onBack  = { nav.popBackStack() }
+            )
         }
+
+
+
+
+
     }
 }

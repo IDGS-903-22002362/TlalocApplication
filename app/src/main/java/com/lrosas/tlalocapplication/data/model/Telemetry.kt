@@ -1,11 +1,14 @@
-// Telemetry.kt (opcional — solo para parse local; Firestore no necesita clase)
 package com.lrosas.tlalocapplication.data.model
 
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.IgnoreExtraProperties
+
+@IgnoreExtraProperties
 data class Telemetry(
-    val plantId: String = "",
-    val timestamp: Long = 0L,
-    val humidity: Int = 0,
-    val light: Float = 0f,
-    val waterQuality: Float = 0f,
-    val waterLevel: Float = 0f
+    val zoneId:       String = "",
+    val timestamp: Long = System.currentTimeMillis(),
+    val humidity:     Float? = null,      // %
+    val light:        Float? = null,      // lx
+    val waterQuality: Float? = null,      // ppm
+    val waterLevel:   Float? = null       // cm
 )

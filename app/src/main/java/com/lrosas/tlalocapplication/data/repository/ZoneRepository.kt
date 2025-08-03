@@ -2,28 +2,69 @@ package com.lrosas.tlalocapplication.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.snapshots
 import com.lrosas.tlalocapplication.data.model.Zone
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 
 class ZoneRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val auth: FirebaseAuth     = FirebaseAuth.getInstance()
 ) {
+
+    /* --------------------- referencia a sub-colección --------------------- */
+
+    /** users/{uid}/zones */
     private fun zonesCol() = db.collection("users")
-        .document(auth.currentUser!!.uid)
+        .document(requireNotNull(auth.currentUser?.uid) { "Usuario no autenticado" })
         .collection("zones")
 
-    fun getZones(): Flow<List<Zone>> = callbackFlow {
-        val sub = zonesCol().addSnapshotListener { s, e ->
-            if (e != null) close(e) else trySend(s!!.toObjects(Zone::class.java))
-        }
-        awaitClose { sub.remove() }
+    /* -------------------------- lecturas -------------------------- */
+
+    /** Flujo vivo con TODAS las zonas ordenadas por nombre. */
+    fun getZones(): Flow<List<Zone>> =
+        zonesCol()
+            .orderBy("name")
+            .snapshots()
+            .map { qs ->
+                qs.documents.mapNotNull { d ->
+                    d.toObject(Zone::class.java)?.copy(id = d.id)
+                }
+            }
+
+    /** Flujo con UNA zona concreta (o `null` si se borra). */
+    fun getZone(id: String): Flow<Zone?> =
+        zonesCol().document(id)
+            .snapshots()
+            .map { d -> d.toObject(Zone::class.java)?.copy(id = d.id) }
+
+    /* -------------------- escritura / actualización -------------------- */
+
+    /** Crea una zona y devuelve el `id` generado. */
+    suspend fun addZone(zone: Zone): String {
+        val ref = zonesCol().add(zone).await()
+        return ref.id
     }
 
-    suspend fun addZone(zone: Zone) {
-        zonesCol().add(zone).await()
+    /** Elimina una zona por su id. */
+    suspend fun deleteZone(id: String) {
+        zonesCol().document(id).delete().await()
+    }
+
+    /**
+     * Actualiza únicamente el nombre de la zona.
+     *  (Separado para que el ViewModel pueda llamarlo fácilmente.)
+     */
+    suspend fun updateZoneName(id: String, newName: String) {
+        zonesCol().document(id).update("name", newName).await()
+    }
+
+    /**
+     * Actualización genérica por campos (por si la necesitas en el futuro).
+     *  Ej.:  updateZone("abc123", mapOf("plantId" to "plant42"))
+     */
+    suspend fun updateZone(id: String, fields: Map<String, Any>) {
+        zonesCol().document(id).update(fields).await()
     }
 }

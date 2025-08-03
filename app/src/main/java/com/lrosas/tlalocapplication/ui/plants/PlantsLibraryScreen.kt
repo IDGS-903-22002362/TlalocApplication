@@ -1,3 +1,4 @@
+/*  ui/plants/PlantsLibraryScreen.kt  */
 package com.lrosas.tlalocapplication.ui.plants
 
 import androidx.compose.foundation.clickable
@@ -11,12 +12,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lrosas.tlalocapplication.data.model.Plant
 import com.lrosas.tlalocapplication.data.repository.PlantRepository
-import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlantsLibraryScreen(
-    onSelect: (Plant) -> Unit,
+    onSelect: (String) -> Unit,          // ⟵ ahora devuelve plantId
     onAdd: () -> Unit,
     vm: PlantsViewModel = viewModel()
 ) {
@@ -43,9 +43,12 @@ fun PlantsLibraryScreen(
             Spacer(Modifier.height(8.dp))
 
             LazyColumn(contentPadding = PaddingValues(8.dp)) {
-                val filtered = plants.filter { it.name.contains(query, true) }
+                val filtered = plants.filter { it.name.contains(query, ignoreCase = true) }
                 items(filtered.size) { idx ->
-                    PlantRow(filtered[idx]) { onSelect(filtered[idx]) }
+                    PlantRow(
+                        plant = filtered[idx],
+                        onClick = { onSelect(filtered[idx].id) }   // ← enviamos sólo el id
+                    )
                 }
             }
         }
@@ -58,11 +61,10 @@ private fun PlantRow(plant: Plant, onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable { onClick() }
+            .clickable(onClick = onClick)
     ) {
-        /* 👇 cambio clave: headlineContent en lugar de headlineText */
         ListItem(
-            headlineContent = { Text(plant.name) }
+            headlineContent = { Text(plant.name) }          // API Material 3
         )
     }
 }
@@ -71,6 +73,5 @@ private fun PlantRow(plant: Plant, onClick: () -> Unit) {
 class PlantsViewModel(
     private val repo: PlantRepository = PlantRepository()
 ) : ViewModel() {
-
-    val plants = repo.getAllPlants()          // Flow<List<Plant>>
+    val plants = repo.getAllPlants()        // Flow<List<Plant>>
 }
