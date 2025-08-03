@@ -19,11 +19,13 @@ fun CalibrateHumScreen(
 ) {
     val scope = rememberCoroutineScope()
 
-    // ← valores en vivo
-    val adc by SensorRepository.humAdcFlow.collectAsStateWithLifecycle(0)
-    val humPct by SensorRepository.humFlow.collectAsStateWithLifecycle(0)
+    // Lecturas en crudo (ADC) y porcentaje real de humedad
+    val adc by SensorRepository.humAdcFlow
+        .collectAsStateWithLifecycle(initialValue = SensorRepository.VALOR_HUMEDO)
+    val humPct by SensorRepository.humPctFlow
+        .collectAsStateWithLifecycle(initialValue = 0)
 
-    // ← marcadores que el usuario guarda
+    // Valores que el usuario marca como “seco” y “húmedo”
     var seco   by remember { mutableStateOf<Int?>(null) }
     var humedo by remember { mutableStateOf<Int?>(null) }
 
@@ -47,28 +49,45 @@ fun CalibrateHumScreen(
             verticalArrangement = Arrangement.spacedBy(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-
+            // Muestra la lectura actual
             Text("Lectura ADC actual: $adc")
             Text("Humedad estimada: $humPct %")
 
+            // Botones para marcar seco y húmedo
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { seco   = adc }) { Text("Guardar SECO") }
-                Button(onClick = { humedo = adc }) { Text("Guardar HÚMEDO") }
+                Button(onClick = { seco = adc }) {
+                    Text("Guardar SECO")
+                }
+                Button(onClick = { humedo = adc }) {
+                    Text("Guardar HÚMEDO")
+                }
             }
 
-            Text("Seco = ${seco ?: "--"}   |   Húmedo = ${humedo ?: "--"}")
+            // Resumen de marcadores
+            Text(
+                "Seco = ${seco ?: "--"}   |   Húmedo = ${humedo ?: "--"}",
+                style = MaterialTheme.typography.bodyMedium
+            )
 
             Spacer(Modifier.height(24.dp))
 
+            // Aplica la calibración y vuelve atrás
             Button(
-                enabled = seco != null && humedo != null,
                 onClick = {
                     scope.launch {
-                        SensorRepository.updateCalibration(seco!!, humedo!!)
+                        // Si algún marcador fuera null, usamos la lectura actual por seguridad
+                        SensorRepository.updateCalibration(
+                            seco   ?: adc,
+                            humedo ?: adc
+                        )
                         onBack()
                     }
-                }
-            ) { Text("Aplicar y volver") }
+                },
+                enabled = (seco != null && humedo != null),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Aplicar y volver")
+            }
         }
     }
 }

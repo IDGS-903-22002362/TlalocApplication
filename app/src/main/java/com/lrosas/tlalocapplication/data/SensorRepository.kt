@@ -1,85 +1,80 @@
 package com.lrosas.tlalocapplication.data
 
+import android.util.Log
 import com.lrosas.tlalocapplication.core.mqtt.HiveMqManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 
 object SensorRepository {
-
-    /* --------------------- parámetros de calibración --------------------- */
-    /** ADC con la sonda al aire (100 % seco).            */
-    var VALOR_SECO   = 3400
-    /** ADC sumergido / sustrato saturado (0 % seco).     */
-    var VALOR_HUMEDO = 1700
-
-    /* --------------------------- topic base ----------------------------- */
+    private const val TAG        = "SensorRepository"
     private const val TOPIC_BASE = "tlaloc"
 
-    /* ------------------ depuración: log de cada mensaje ----------------- */
+    var VALOR_SECO   = 3400
+    var VALOR_HUMEDO = 1700
+
+    // Scope para los stateIn
+    private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     init {
-        // Lanza una corrutina en segundo plano que imprime todo lo que llega
-        HiveMqManager.incoming
-            .onEach { (topic, msg) ->
-                println("DEBUG-MQTT ➜ $topic -> $msg")
-            }
-            .launchIn(CoroutineScope(Dispatchers.IO))
+        // Arranca la conexión una sola vez
+        repoScope.launch { HiveMqManager.connect() }
     }
 
-    /* -------------------- flujo crudo (topic → payload) ------------------ */
+    /** Flujo “crudo” sin shareIn: retiene el último mensaje via replay=1 en incoming */
     private val raw: Flow<Pair<String, String>> =
         HiveMqManager.incoming
-            .filter { (topic, _) -> topic.startsWith("$TOPIC_BASE/tele/") }
+            .onEach { Log.v(TAG, "raw → $it") }
+            .filter { it.first.startsWith("$TOPIC_BASE/tele/") }
 
-    /* -------------------- sensores individuales ------------------------- */
-
-    /** Luxómetro (lx) */
-    val luxFlow: Flow<Float> = raw
+    /** Luxómetro */
+    val luxFlow: StateFlow<Float> = raw
         .filter { it.first.endsWith("/lux") }
-        .map   { (_, msg) -> msg.toFloatOrNull() ?: 0f }
+        .map { it.second.toFloatOrNull() ?: 0f }
+        .onEach { Log.d(TAG, "→ luxFlow: $it") }
+        .stateIn(repoScope, SharingStarted.Eagerly, 0f)
 
-    /* --- humedad --- */
-    val humAdcFlow: Flow<Int> = raw
+    /** Humedad ADC crudo */
+    val humAdcFlow: StateFlow<Int> = raw
         .filter { it.first.endsWith("/humidity") }
-        .map   { (_, msg) -> msg.toIntOrNull() ?: 0 }
+        .map { it.second.toIntOrNull() ?: VALOR_HUMEDO }
+        .onEach { Log.d(TAG, "→ humAdcFlow: $it") }
+        .stateIn(repoScope, SharingStarted.Eagerly, VALOR_HUMEDO)
 
-    /** Humedad en % (0-100) a partir del ADC crudo y la calibración. */
-    val humFlow: Flow<Int> = humAdcFlow
-        .map { adc ->
-            val pct = 100f * (VALOR_SECO - adc) / (VALOR_SECO - VALOR_HUMEDO)
-            pct.coerceIn(0f, 100f).toInt()
-        }
+    /** Humedad % (directo del hardware) */
+    val humPctFlow: StateFlow<Int> = raw
+        .filter { it.first.endsWith("/humidity") }
+        .map { it.second.toIntOrNull() ?: 0 }
+        .onEach { Log.d(TAG, "→ humPctFlow: $it") }
+        .stateIn(repoScope, SharingStarted.Eagerly, 0)
 
-    /** TDS / EC (ppm) */
-    val tdsFlow: Flow<Float> = raw
+    /** TDS / EC */
+    val tdsFlow: StateFlow<Float> = raw
         .filter { it.first.endsWith("/tds") }
-        .map   { (_, msg) -> msg.toFloatOrNull() ?: 0f }
+        .map { it.second.toFloatOrNull() ?: 0f }
+        .onEach { Log.d(TAG, "→ tdsFlow: $it") }
+        .stateIn(repoScope, SharingStarted.Eagerly, 0f)
 
-    /** Distancia (cm) medida por el ultrasónico */
-    val distFlow: Flow<Float> = raw
+    /** Distancia (cm) */
+    val distFlow: StateFlow<Float> = raw
         .filter { it.first.endsWith("/distance") }
-        .map   { (_, msg) -> msg.toFloatOrNull() ?: -1f }
+        .map { it.second.toFloatOrNull() ?: -1f }
+        .onEach { Log.d(TAG, "→ distFlow: $it") }
+        .stateIn(repoScope, SharingStarted.Eagerly, -1f)
 
-    /* ------------------------ envío de comandos ------------------------- */
-
-    /**
-     * Envía un comando genérico:
-     *   zoneId → “zone1”, “zone2”…
-     *   key    → “pump”, “led”, “stream”…
-     *   value  → “ON”, “OFF”, “5”…
-     */
-    fun sendCommand(zoneId: String, key: String, value: String) =
-        HiveMqManager.publishCmd(zoneId, key, value)
-
-    /** Atajo para encender / apagar la bomba */
-    fun setPump(zoneId: String, on: Boolean) =
-        sendCommand(zoneId, "pump", if (on) "ON" else "OFF")
-
-    /* -------------------- persistir nueva calibración ------------------- */
-
+    /** Guarda calibración de seco/húmedo */
     suspend fun updateCalibration(seco: Int, humedo: Int) {
+        Log.d(TAG, "Calibración guardada: seco=$seco, humedo=$humedo")
         VALOR_SECO   = seco
         VALOR_HUMEDO = humedo
-        // TODO: guardar en DataStore si quieres conservar tras reinicios
+    }
+
+    /** Control de bomba */
+    fun setPump(zoneId: String, on: Boolean) {
+        repoScope.launch {
+            HiveMqManager.publishCmd(zoneId, "pump", if (on) "ON" else "OFF")
+        }
     }
 }
