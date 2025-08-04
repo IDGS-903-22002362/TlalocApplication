@@ -81,4 +81,22 @@ class ZonesViewModel(
         delay(pumpDurationMs)                         // espera
         HiveMqManager.publishCmd(zoneId, "pump", "OFF")
     }
+    init {
+        // ① En cuanto tengamos un care válido para la zona seleccionada…
+        selected
+            .filterNotNull()                    // solo cuando haya triple
+            .mapNotNull { it.third }            // extrae el Care
+            .map { care -> care.humidity }      // extrae el % humedad ideal
+            .distinctUntilChanged()             // solo cuando cambie
+            .onEach { idealPct ->
+                // ② publica por MQTT el umbral al ESP32:
+                HiveMqManager.publishCmd(
+                    zone   = selectedId.value!!,          // ← aquí
+                    action = "threshold",
+                    value  = idealPct.toString()
+                )
+            }
+            .launchIn(viewModelScope)           // ✨ arranca en el scope del VM
+    }
+
 }
