@@ -67,4 +67,20 @@ class ZoneRepository(
     suspend fun updateZone(id: String, fields: Map<String, Any>) {
         zonesCol().document(id).update(fields).await()
     }
+
+    suspend fun addZoneWithId(id: String, zone: Zone) {
+        zonesCol()              // …/users/{uid}/zones
+            .document(id)       // 👉 usamos el id que pase la UI
+            .set(zone)          // (PUT completo)
+            .await()
+    }
+    suspend fun nextSequentialNumber(): Int {
+        val snap = zonesCol().get().await()
+        // Filtra ids "zoneN" y localiza el mayor N
+        val max = snap.documents.mapNotNull { doc ->
+            doc.id.removePrefix("zone").toIntOrNull()
+        }.maxOrNull() ?: 0
+        return max + 1
+    }
+
 }
