@@ -14,29 +14,35 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.PI
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZoneDetailScreen(
     zoneId   : String,
     zonesVm  : ZonesViewModel,         // VM compartido
-    onBack   : () -> Unit,             // para el botón Atrás
-    onHistory: () -> Unit              // para Ver historial
+    onBack   : () -> Unit,             // acción Atrás
+    onHistory: () -> Unit              // acción Ver historial
 ) {
-    // ① – Selección “en frío” si venimos de deep link o proceso detenido
+    // ① Selección “en frío”
     LaunchedEffect(zoneId) {
         if (zonesVm.selectedId.value != zoneId) {
             zonesVm.select(zoneId)
         }
     }
 
-    // ② – Observamos la triple (Zone, Telemetry?, Care?)
+    // ② Observamos Zone · Telemetry? · Care?
     val triple by zonesVm.selected.collectAsStateWithLifecycle(initialValue = null)
 
-    // ③ – Estados locales para el manual pump y el switch
+    // Estados locales
     var pumping by remember { mutableStateOf(false) }
+    var auto    by remember(triple?.first) { mutableStateOf(triple?.first?.auto ?: false) }
     val coroutineScope = rememberCoroutineScope()
-    var auto by remember(triple?.first) { mutableStateOf(triple?.first?.auto ?: false) }
+
+    // Dimensiones del cilindro (cm)
+    val tankHeightCm = 13f
+    val diameterCm = 9f
+    val tankRadiusCm = diameterCm / 2f
 
     Scaffold(
         topBar = {
@@ -50,10 +56,9 @@ fun ZoneDetailScreen(
             )
         }
     ) { padding ->
-        // Mientras carga
         if (triple == null) {
             Box(
-                modifier = Modifier
+                Modifier
                     .fillMaxSize()
                     .padding(padding),
                 contentAlignment = Alignment.Center
@@ -65,8 +70,15 @@ fun ZoneDetailScreen(
 
         // Desempaquetamos
         val (zone, reading, care) = triple!!
+
+        // Calculamos nivel y volumen
+        val distCm   = reading?.waterLevel ?: 0f
+        val levelCm  = (tankHeightCm - distCm).coerceIn(0f, tankHeightCm)
+        val volumeCm3 = PI * tankRadiusCm * tankRadiusCm * levelCm
+        val volumeL   = volumeCm3 / 1000f
+
         Column(
-            modifier = Modifier
+            Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(24.dp),
@@ -105,7 +117,6 @@ fun ZoneDetailScreen(
                         pumping = true
                         zonesVm.manualPump(zone.id)
                         coroutineScope.launch {
-                            // esperar el mismo tiempo que en ZonesViewModel.manualPump
                             delay(10_000)
                             pumping = false
                         }
@@ -119,7 +130,7 @@ fun ZoneDetailScreen(
             // ─── Gauge de humedad ──────────────────────────────
             ElevatedCard {
                 Box(
-                    modifier = Modifier
+                    Modifier
                         .size(180.dp)
                         .padding(16.dp),
                     contentAlignment = Alignment.Center
@@ -130,18 +141,16 @@ fun ZoneDetailScreen(
                         strokeWidth = 12.dp,
                         modifier = Modifier.fillMaxSize()
                     )
-                    Text(
-                        "$pct %",
-                        style = MaterialTheme.typography.headlineMedium
-                    )
+                    Text("$pct %", style = MaterialTheme.typography.headlineMedium)
                 }
             }
 
             // ─── Métricas ──────────────────────────────────────
-            InfoRow("Luz",     reading?.light        ?.let { "%.0f lx".format(it) }            ?: "--")
-            InfoRow("Humedad", reading?.humidity     ?.let { "$it %" }                          ?: "--")
-            InfoRow("TDS",     reading?.waterQuality ?.let { "%.0f ppm".format(it) }          ?: "--")
-            InfoRow("Nivel",   reading?.waterLevel   ?.let { "%.1f cm".format(it) }           ?: "--")
+            InfoRow("Luz",       reading?.light        ?.let { "%.0f lx".format(it) }     ?: "--")
+            InfoRow("Humedad",   reading?.humidity     ?.let { "$it %" }                  ?: "--")
+            InfoRow("TDS",       reading?.waterQuality ?.let { "%.0f ppm".format(it) }   ?: "--")
+            InfoRow("Nivel agua", "%.1f cm".format(levelCm))
+            InfoRow("Volumen",    "%.2f L".format(volumeL))
 
             // ─── Umbral ideal (Care) ───────────────────────────
             care?.let {
@@ -157,11 +166,9 @@ fun ZoneDetailScreen(
 /** Componente auxiliar para las filas de métricas */
 @Composable
 private fun InfoRow(label: String, value: String) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween
