@@ -82,5 +82,10 @@ class ZoneRepository(
         }.maxOrNull() ?: 0
         return max + 1
     }
+    suspend fun setAuto(zoneId: String, auto: Boolean) =
+        zonesCol().document(zoneId).update("auto", auto).await()
 
+    suspend fun updateZoneFields(zoneId: String, fields: Map<String, Any>) {
+        zonesCol().document(zoneId).update(fields).await()
+    }
 }

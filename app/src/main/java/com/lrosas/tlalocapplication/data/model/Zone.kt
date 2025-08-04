@@ -5,5 +5,6 @@ import com.google.firebase.firestore.DocumentId
 data class Zone(
     @DocumentId val id: String = "",
     val name: String = "",
-    val plantId: String = ""
+    val plantId: String = "",
+    val auto    : Boolean = true
 )

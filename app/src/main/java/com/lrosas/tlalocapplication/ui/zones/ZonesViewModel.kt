@@ -2,19 +2,22 @@ package com.lrosas.tlalocapplication.ui.zones
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lrosas.tlalocapplication.core.mqtt.HiveMqManager
 import com.lrosas.tlalocapplication.data.model.Care
 import com.lrosas.tlalocapplication.data.model.Telemetry
 import com.lrosas.tlalocapplication.data.model.Zone
 import com.lrosas.tlalocapplication.data.repository.CareRepository
 import com.lrosas.tlalocapplication.data.repository.TelemetryRepository
 import com.lrosas.tlalocapplication.data.repository.ZoneRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class ZonesViewModel(
     private val zoneRepo : ZoneRepository      = ZoneRepository(),
     private val teleRepo : TelemetryRepository = TelemetryRepository(),
-    private val careRepo : CareRepository      = CareRepository()
+    private val careRepo : CareRepository      = CareRepository(),
+    private val pumpDurationMs: Long            = 10_000L
 ) : ViewModel() {
 
     /* ─────────── Todas las zonas del usuario ─────────── */
@@ -67,5 +70,15 @@ class ZonesViewModel(
 
     fun renameZone(zoneId: String, newName: String) = viewModelScope.launch {
         zoneRepo.updateZoneName(zoneId, newName)
+    }
+    fun toggleAuto(zoneId: String, auto: Boolean) = viewModelScope.launch {
+        zoneRepo.updateZoneFields(zoneId, mapOf("auto" to auto))
+        HiveMqManager.publishCmd(zoneId, "auto", if (auto) "ON" else "OFF")
+    }
+
+    fun manualPump(zoneId: String) = viewModelScope.launch {
+        HiveMqManager.publishCmd(zoneId, "pump", "ON")
+        delay(pumpDurationMs)                         // espera
+        HiveMqManager.publishCmd(zoneId, "pump", "OFF")
     }
 }
