@@ -54,7 +54,7 @@ class ZonesViewModel(
                     if (zone == null) flowOf(null)
                     else combine(
                         teleRepo.live(zone.id),              // 👈 nuevo flujo
-                        careRepo.getCareByPlant(zone.id)
+                        careRepo.getCareByPlant(zone.plantId)
                     ) { tele, care ->
                         Triple(zone, tele, care)
                     }

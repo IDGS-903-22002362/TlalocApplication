@@ -146,11 +146,36 @@ fun ZoneDetailScreen(
             }
 
             // ─── Métricas ──────────────────────────────────────
-            InfoRow("Luz",       reading?.light        ?.let { "%.0f lx".format(it) }     ?: "--")
-            InfoRow("Humedad",   reading?.humidity     ?.let { "$it %" }                  ?: "--")
-            InfoRow("TDS",       reading?.waterQuality ?.let { "%.0f ppm".format(it) }   ?: "--")
+            // ─── Métricas ──────────────────────────────────────
+            InfoRow("Luz", reading?.light?.let { "%.0f lx".format(it) } ?: "--")
+
+// Humedad crítica
+            val humidity = reading?.humidity
+            val idealHumidity = care?.humidity
+            val humidityCritical = humidity != null && idealHumidity != null && humidity < (idealHumidity * 0.25)
+
+            InfoRow(
+                label = "Humedad",
+                value = humidity?.let { "$it %" } ?: "--",
+                isCritical = humidityCritical,
+                warning = if (humidityCritical) "🌱 Riega tu planta" else null
+            )
+
+// TDS
+            InfoRow("TDS", reading?.waterQuality?.let { "%.0f ppm".format(it) } ?: "--")
+
+// Nivel
             InfoRow("Nivel agua", "%.1f cm".format(levelCm))
-            InfoRow("Volumen",    "%.2f L".format(volumeL))
+
+// Volumen crítico
+            val volumeCritical = volumeL < 0.250
+
+            InfoRow(
+                label = "Volumen",
+                value = "%.2f L".format(volumeL),
+                isCritical = volumeCritical,
+                warning = if (volumeCritical) "🫗 Rellena el depósito" else null
+            )
 
             // ─── Umbral ideal (Care) ───────────────────────────
             care?.let {
@@ -165,16 +190,43 @@ fun ZoneDetailScreen(
 
 /** Componente auxiliar para las filas de métricas */
 @Composable
-private fun InfoRow(label: String, value: String) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(label, style = MaterialTheme.typography.titleMedium)
-            Text(value, style = MaterialTheme.typography.bodyLarge)
+private fun InfoRow(
+    label: String,
+    value: String,
+    isCritical: Boolean = false,
+    warning: String? = null
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isCritical) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (isCritical) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    value,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (isCritical) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            warning?.let {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }
