@@ -87,14 +87,7 @@ fun SensorTestScreen(
             ) { Text(if (bombaOn) "Apagar bomba" else "Encender bomba") }
 
             /* ---------- historial ---------- */
-            OutlinedButton(
-                onClick  = { onNavigate(Route.History.r) },
-                modifier = Modifier.fillMaxWidth(0.7f)
-            ) {
-                Icon(Icons.Default.History, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Ver historial")
-            }
+
 
             /* ---------- botón CONTINUAR ---------- */
             Spacer(Modifier.height(12.dp))

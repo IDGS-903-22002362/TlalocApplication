@@ -1,5 +1,3 @@
-/*  data/repository/TelemetryRepository.kt  */
-
 package com.lrosas.tlalocapplication.data.repository
 
 /* ---------- Firebase ---------- */
@@ -8,7 +6,6 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.Timestamp
 
 /* ---------- Domain ---------- */
 import com.lrosas.tlalocapplication.data.model.Telemetry
@@ -20,13 +17,11 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
 class TelemetryRepository(
-    private val db  : FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val auth: FirebaseAuth      = FirebaseAuth.getInstance()
+    private val db   : FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val auth : FirebaseAuth      = FirebaseAuth.getInstance()
 ) {
 
-    /* ───────────────────────── helpers ───────────────────────── */
-
-    /** Sub‐colección telemetry ➜ documento único `last`. */
+    /** Ruta a `/users/{uid}/zones/{zoneId}/telemetry/last` */
     private fun lastDoc(zoneId: String) =
         db.collection("users")
             .document(auth.currentUser!!.uid)
@@ -35,45 +30,42 @@ class TelemetryRepository(
             .collection("telemetry")
             .document("last")
 
-    /* ───────────────────────── escritura ───────────────────────── */
-
     /**
-     * Guarda (merge) las claves presentes en `fields`.
-     * Si el map **no** trae la clave `"timestamp"`, la añade con
-     * `FieldValue.serverTimestamp()`.
+     * Guarda (merge) sólo los campos presentes en `fields`.
+     * Si no incluye `"timestamp"`, lo añade como serverTimestamp().
      *
-     * ```kotlin
-     * save("zone1", mapOf("humidity" to 48f))
-     * save("zone1", mapOf("light" to 5300f, "timestamp" to Timestamp.now()))
+     * Ejemplos de uso:
+     * ```
+     * save("zone1", mapOf("humidity" to 45f))
+     * save("zone1", mapOf("light" to 12000f, "waterLevel" to 2.3f))
      * ```
      */
     suspend fun save(zoneId: String, fields: Map<String, Any>) {
-        val data = if ("timestamp" in fields) {
-            fields                                    // ya viene el campo
+        val toWrite = if ("timestamp" in fields) {
+            fields
         } else {
             fields + ("timestamp" to FieldValue.serverTimestamp())
         }
 
         lastDoc(zoneId)
-            .set(data, SetOptions.merge())            // merge incremental ✅
+            .set(toWrite, SetOptions.merge())
             .await()
     }
 
-    /* ───────────────────────── lectura en vivo ───────────────────────── */
-
     /**
-     * Flujo (StateFlow-like) con el documento `last`.
-     * ⇒ emite **null** mientras aún no existe nada.
+     * Flujo en vivo del documento único `last`.
+     * Emitirá `null` si aún no existe.
      */
     fun live(zoneId: String): Flow<Telemetry?> = callbackFlow {
-        val reg: ListenerRegistration = lastDoc(zoneId)
-            .addSnapshotListener { snap, err ->
-                if (err != null) {
-                    close(err)
+        val registration: ListenerRegistration = lastDoc(zoneId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    close(error)
                 } else {
-                    trySend(snap?.toObject(Telemetry::class.java))
+                    trySend(snapshot?.toObject(Telemetry::class.java))
                 }
             }
-        awaitClose { reg.remove() }
+
+        awaitClose { registration.remove() }
     }
 }

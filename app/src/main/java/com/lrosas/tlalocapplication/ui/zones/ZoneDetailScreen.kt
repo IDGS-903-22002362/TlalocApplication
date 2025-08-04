@@ -1,4 +1,5 @@
-/*  ui/zones/ZoneDetailScreen.kt  */
+/* ui/zones/ZoneDetailScreen.kt */
+
 package com.lrosas.tlalocapplication.ui.zones
 
 /* ---------- Compose ---------- */
@@ -17,21 +18,25 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZoneDetailScreen(
-    zoneId : String,
-    zonesVm: ZonesViewModel,         // ← llega desde NavHost
-    onBack : () -> Unit
+    zoneId   : String,
+    zonesVm  : ZonesViewModel,         // VM compartido
+    onBack   : () -> Unit,             // para el botón Atrás
+    onHistory: () -> Unit              // para Ver historial
 ) {
-    /* ① – si entramos “en frío” pedimos la selección al VM */
+    // ① – Selección “en frío” si venimos de deep link o proceso detenido
     LaunchedEffect(zoneId) {
-        if (zonesVm.selectedId.value != zoneId) zonesVm.select(zoneId)
+        if (zonesVm.selectedId.value != zoneId) {
+            zonesVm.select(zoneId)
+        }
     }
 
-    /* ② – triple en vivo (Zone · Telemetry? · Care?) */
+    // ② – Observamos la triple (Zone, Telemetry?, Care?)
     val triple by zonesVm.selected.collectAsStateWithLifecycle(initialValue = null)
 
-    /* ③ – estados locales */
+    // ③ – Estados locales para el manual pump y el switch
     var pumping by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    val coroutineScope = rememberCoroutineScope()
+    var auto by remember(triple?.first) { mutableStateOf(triple?.first?.auto ?: false) }
 
     Scaffold(
         topBar = {
@@ -44,35 +49,31 @@ fun ZoneDetailScreen(
                 }
             )
         }
-    ) { pad ->
-
+    ) { padding ->
+        // Mientras carga
         if (triple == null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(pad),
+                    .padding(padding),
                 contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
+            ) {
+                CircularProgressIndicator()
+            }
             return@Scaffold
         }
 
-        /* ------------ desempaquetado ------------ */
-        val zone    = triple!!.first
-        val reading = triple!!.second          // puede ser null
-        val care    = triple!!.third           // puede ser null
-
-        var auto by remember(zone) { mutableStateOf(zone.auto) }
-
+        // Desempaquetamos
+        val (zone, reading, care) = triple!!
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(pad)
+                .padding(padding)
                 .padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment  = Alignment.CenterHorizontally
         ) {
-
-            /* ---------- Switch Automático ---------- */
+            // ─── Switch Automático ─────────────────────────────
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -83,20 +84,29 @@ fun ZoneDetailScreen(
                     checked = auto,
                     onCheckedChange = { checked ->
                         auto = checked
-                        zonesVm.toggleAuto(zone.id, checked)      // 🔄 Firestore + MQTT
+                        zonesVm.toggleAuto(zone.id, checked)
                     }
                 )
             }
 
-            /* ---------- Botón riego manual ---------- */
+            // ─── Botón Ver historial ───────────────────────────
+            Button(
+                onClick = onHistory,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Ver historial")
+            }
+
+            // ─── Botón riego manual (solo si auto está OFF) ────
             if (!auto) {
                 Button(
                     enabled = !pumping,
                     onClick = {
                         pumping = true
-                        zonesVm.manualPump(zone.id)               // ON → delay → OFF
-                        scope.launch {
-                            delay(10_000)                         // mismo tiempo que en VM
+                        zonesVm.manualPump(zone.id)
+                        coroutineScope.launch {
+                            // esperar el mismo tiempo que en ZonesViewModel.manualPump
+                            delay(10_000)
                             pumping = false
                         }
                     },
@@ -106,7 +116,7 @@ fun ZoneDetailScreen(
                 }
             }
 
-            /* ---------- Gauge de humedad ---------- */
+            // ─── Gauge de humedad ──────────────────────────────
             ElevatedCard {
                 Box(
                     modifier = Modifier
@@ -127,13 +137,13 @@ fun ZoneDetailScreen(
                 }
             }
 
-            /* ---------- Métricas ---------- */
-            InfoRow("Luz",     reading?.light        ?.let { "%.0f lx".format(it) } ?: "--")
-            InfoRow("Humedad", reading?.humidity     ?.let { "$it %" }             ?: "--")
-            InfoRow("TDS",     reading?.waterQuality ?.let { "%.0f ppm".format(it) }?: "--")
-            InfoRow("Nivel",   reading?.waterLevel   ?.let { "%.1f cm".format(it) } ?: "--")
+            // ─── Métricas ──────────────────────────────────────
+            InfoRow("Luz",     reading?.light        ?.let { "%.0f lx".format(it) }            ?: "--")
+            InfoRow("Humedad", reading?.humidity     ?.let { "$it %" }                          ?: "--")
+            InfoRow("TDS",     reading?.waterQuality ?.let { "%.0f ppm".format(it) }          ?: "--")
+            InfoRow("Nivel",   reading?.waterLevel   ?.let { "%.1f cm".format(it) }           ?: "--")
 
-            /* ---------- Umbral ideal (si existe) ---------- */
+            // ─── Umbral ideal (Care) ───────────────────────────
             care?.let {
                 Text(
                     "Humedad ideal: ${it.humidity} %",
@@ -144,10 +154,12 @@ fun ZoneDetailScreen(
     }
 }
 
-/* ---------- Helper visual ---------- */
+/** Componente auxiliar para las filas de métricas */
 @Composable
 private fun InfoRow(label: String, value: String) {
-    ElevatedCard(Modifier.fillMaxWidth()) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

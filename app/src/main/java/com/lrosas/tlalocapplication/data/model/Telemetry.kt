@@ -9,8 +9,5 @@ data class Telemetry(
     val light:        Float? = null,
     val waterLevel:   Float? = null,
     val waterQuality: Float? = null,
-
-    // ► guarda y lee como Timestamp, no como Long
-    @ServerTimestamp          // cuando se sube con null → lo rellena Firestore
-    val timestamp: Timestamp? = null
+    val timestamp   : Any?              = null
 )

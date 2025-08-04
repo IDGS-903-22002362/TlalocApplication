@@ -8,9 +8,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.lrosas.tlalocapplication.ui.HistoryViewModel
 
 /* ---------- Pantallas flujo inicial ---------- */
 import com.lrosas.tlalocapplication.ui.SensorTestScreen
@@ -35,7 +38,9 @@ sealed class Route(val r: String) {
     object Manual    : Route("manual")
     object Test      : Route("test")
     object Calibrate : Route("calibrate")
-    object History   : Route("history")
+    object History : Route("history/{zoneId}") {
+        fun create(zoneId: String) = "history/$zoneId"
+    }
 
     object Zones      : Route("zones")
     object AddZone    : Route("zones/add")
@@ -100,8 +105,18 @@ fun AppNav(
             )
         }
         composable(Route.Calibrate.r) { CalibrateHumScreen { nav.popBackStack() } }
-        composable(Route.History.r)   { HistoryScreen(onBack = { nav.popBackStack() }) }
-
+        composable(
+            route = Route.History.r,
+            arguments = listOf(navArgument("zoneId") {
+                type = NavType.StringType
+            })
+        ) { backStackEntry ->
+            val zoneId = backStackEntry.arguments!!.getString("zoneId")!!
+            HistoryScreen(
+                zoneId = zoneId,
+                onBack = { nav.popBackStack() }
+            )
+        }
         /* ========== ZONAS / PLANTAS ========== */
         composable(Route.Zones.r) {
             ZonesScreen(
@@ -135,20 +150,21 @@ fun AppNav(
         }
 
         // AppNav.kt  – fragmento de la ruta detalle
-        composable(Route.ZoneDetail.r) { detailEntry ->
-            val zoneId = detailEntry.arguments?.getString("zoneId") ?: return@composable
-
-            /* backEntry “dueño” del ZonesViewModel – recordado para evitar el warning */
-            val zonesBackEntry = remember { nav.getBackStackEntry(Route.Zones.r) }
-
-            /* ViewModel compartido */
-            val zonesVm: ZonesViewModel = viewModel(zonesBackEntry)
-
-            /* Pantalla detalle con el VM compartido */
+        composable(Route.ZoneDetail.r) { backEntry ->
+            val zoneId = backEntry.arguments?.getString("zoneId") ?: return@composable
+            val zonesVm = viewModel<ZonesViewModel>(backEntry)
             ZoneDetailScreen(
-                zoneId  = zoneId,
-                zonesVm = zonesVm,
-                onBack  = { nav.popBackStack() }
+                zoneId   = zoneId,
+                zonesVm  = zonesVm,
+                onBack   = { nav.popBackStack() },
+                onHistory= { nav.navigate("history/$zoneId") }
+            )
+        }
+        composable("history/{zoneId}") { historyBackEntry ->
+            val zoneId = historyBackEntry.arguments?.getString("zoneId") ?: return@composable
+            HistoryScreen(
+                zoneId = zoneId,
+                onBack = { nav.popBackStack() }
             )
         }
 
