@@ -1,50 +1,50 @@
-/*  ui/zones/NewZoneScreen.kt  */
 package com.lrosas.tlalocapplication.ui.zones
 
-/* ---------- Compose ---------- */
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-
-/* ---------- Navigation ---------- */
-import androidx.navigation.NavHostController
-
-/* ---------- View-model ---------- */
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-
-/* ---------- Repositorios / modelos ---------- */
+import androidx.navigation.NavHostController
+import com.lrosas.tlalocapplication.R
 import com.lrosas.tlalocapplication.data.model.Plant
 import com.lrosas.tlalocapplication.data.model.Zone
 import com.lrosas.tlalocapplication.data.repository.PlantRepository
 import com.lrosas.tlalocapplication.data.repository.ZoneRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
-/* ─────────────────────────────── UI ──────────────────────────────── */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewZoneScreen(
     navController: NavHostController,
-    onSaved:      () -> Unit,
-    onPickPlant:  () -> Unit = {},
-    vm:           NewZoneViewModel = viewModel()
+    onSaved: () -> Unit,
+    onBack: () -> Unit = {},
+    onPickPlant: () -> Unit = {},
+    vm: NewZoneViewModel = viewModel()
 ) {
-    /* ---------- estados locales ---------- */
     var name by remember { mutableStateOf("") }
-
-    /*  Sugerencia de ID: se reinicia cada vez que el VM calcule uno nuevo  */
     val suggested by vm.suggestedId.collectAsState()
     var zoneId by remember(suggested) { mutableStateOf(suggested) }
-
     val scope = rememberCoroutineScope()
 
-    /* ---------- escuchar el id de planta devuelto desde la biblioteca ---------- */
+    val greenPrimary = colorResource(id = R.color.green_primary)
+    val white = colorResource(id = R.color.white)
+
     LaunchedEffect(Unit) {
         navController.currentBackStackEntry
             ?.savedStateHandle
@@ -58,62 +58,172 @@ fun NewZoneScreen(
             }
     }
 
-    /* ----------------------------- UI ----------------------------- */
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("Nueva zona") }) }
-    ) { pad ->
-        Column(
-            Modifier
-                .padding(pad)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            /* Nombre visible */
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Nombre de la zona") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            /* ID interno (editable) */
-            OutlinedTextField(
-                value = zoneId,
-                onValueChange = { zoneId = it.trim() },
-                label = { Text("ID interno (único)") },
-                supportingText = { Text("Ej.: zone1, huertoA…") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            /* Elegir planta */
-            Button(
-                onClick = onPickPlant,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(vm.selectedPlant?.name ?: "Elegir planta")
-            }
-
-            /* Guardar */
-            Button(
-                enabled = name.isNotBlank() &&
-                        zoneId.isNotBlank() &&
-                        vm.selectedPlant != null,
-                onClick = {
-                    scope.launch {
-                        vm.saveZone(
-                            desiredId = zoneId,
-                            name      = name.trim()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(greenPrimary)
+    ) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            "Agregar Zona",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = white
                         )
-                        onSaved()
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = white)
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent
+                    )
+                )
+            },
+            containerColor = Color.Transparent
+        ) { padding ->
+            Card(
+                modifier = Modifier
+                    .padding(padding)
+                    .padding(24.dp)
+                    .fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(containerColor = white)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    Text(
+                        "Nueva Zona",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = greenPrimary
+                    )
+
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nombre de la zona") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.medium,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = greenPrimary,
+                            unfocusedBorderColor = Color.Gray
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = zoneId,
+                        onValueChange = { zoneId = it.trim() },
+                        label = { Text("ID interno (único)") },
+                        supportingText = { Text("Ej.: zone1, huertoA…") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.medium,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = greenPrimary,
+                            unfocusedBorderColor = Color.Gray
+                        )
+                    )
+
+                    // Selector de planta
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Planta",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.Gray
+                        )
+                        OutlinedButton(
+                            onClick = onPickPlant,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium,
+                            border = BorderStroke(1.dp, Color.Gray),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    vm.selectedPlant?.name ?: "Seleccionar planta",
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Seleccionar",
+                                    tint = Color.Gray
+                                )
+                            }
+                        }
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Guardar") }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Divider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = Color.LightGray
+                        )
+
+                        Text(
+                            "Usar valores predeterminados",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.Gray
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    zoneId = suggested
+                                    name = ""
+                                },
+                                modifier = Modifier.weight(1f),
+                                border = BorderStroke(1.dp, greenPrimary),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = greenPrimary
+                                )
+                            ) {
+                                Text("Restaurar")
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        vm.saveZone(zoneId.trim(), name.trim())
+                                        onSaved()
+                                    }
+                                },
+                                enabled = name.isNotBlank() &&
+                                        zoneId.isNotBlank() &&
+                                        vm.selectedPlant != null,
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = greenPrimary,
+                                    contentColor = white
+                                )
+                            ) {
+                                Text("Guardar")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
+
 
 /* ─────────────────────────–– ViewModel ─────────────────────────–– */
 class NewZoneViewModel(

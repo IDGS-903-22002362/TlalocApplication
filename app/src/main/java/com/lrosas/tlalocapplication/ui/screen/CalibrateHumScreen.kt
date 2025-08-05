@@ -7,8 +7,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.lrosas.tlalocapplication.R
 import com.lrosas.tlalocapplication.data.SensorRepository
 import kotlinx.coroutines.launch
 
@@ -19,25 +23,36 @@ fun CalibrateHumScreen(
 ) {
     val scope = rememberCoroutineScope()
 
-    // Lecturas en crudo (ADC) y porcentaje real de humedad
     val adc by SensorRepository.humAdcFlow
         .collectAsStateWithLifecycle(initialValue = SensorRepository.VALOR_HUMEDO)
     val humPct by SensorRepository.humPctFlow
         .collectAsStateWithLifecycle(initialValue = 0)
 
-    // Valores que el usuario marca como “seco” y “húmedo”
-    var seco   by remember { mutableStateOf<Int?>(null) }
+    var seco by remember { mutableStateOf<Int?>(null) }
     var humedo by remember { mutableStateOf<Int?>(null) }
 
+    val greenPrimary = colorResource(id = R.color.green_primary)
+    val white = colorResource(id = R.color.white)
+
     Scaffold(
+        containerColor = greenPrimary,
         topBar = {
-            TopAppBar(
-                title = { Text("Calibrar humedad") },
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        "Calibrar humedad",
+                        color = white,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Atrás")
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = white)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.Transparent
+                )
             )
         }
     ) { pad ->
@@ -46,45 +61,76 @@ fun CalibrateHumScreen(
                 .fillMaxSize()
                 .padding(pad)
                 .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Muestra la lectura actual
-            Text("Lectura ADC actual: $adc")
-            Text("Humedad estimada: $humPct %")
+            // Tarjeta de lectura actual
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = white)
+            ) {
+                Column(
+                    Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Lectura ADC actual: $adc", style = MaterialTheme.typography.bodyMedium)
+                    Text("Humedad estimada: $humPct %", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
 
-            // Botones para marcar seco y húmedo
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { seco = adc }) {
+            // Botones de calibración
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(
+                    onClick = { seco = adc },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = white,
+                        contentColor = greenPrimary
+                    )
+                ) {
                     Text("Guardar SECO")
                 }
-                Button(onClick = { humedo = adc }) {
+                Button(
+                    onClick = { humedo = adc },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = white,
+                        contentColor = greenPrimary
+                    )
+                ) {
                     Text("Guardar HÚMEDO")
                 }
             }
 
-            // Resumen de marcadores
+            // Resumen
             Text(
                 "Seco = ${seco ?: "--"}   |   Húmedo = ${humedo ?: "--"}",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                color = white
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.weight(1f))
 
-            // Aplica la calibración y vuelve atrás
+            // Botón aplicar
             Button(
                 onClick = {
                     scope.launch {
-                        // Si algún marcador fuera null, usamos la lectura actual por seguridad
                         SensorRepository.updateCalibration(
-                            seco   ?: adc,
+                            seco ?: adc,
                             humedo ?: adc
                         )
                         onBack()
                     }
                 },
                 enabled = (seco != null && humedo != null),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = white,
+                    contentColor = greenPrimary
+                )
             ) {
                 Text("Aplicar y volver")
             }

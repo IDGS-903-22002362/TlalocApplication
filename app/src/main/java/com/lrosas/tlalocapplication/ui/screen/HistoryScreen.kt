@@ -25,17 +25,12 @@ fun HistoryScreen(
     zoneId: String,
     onBack: () -> Unit
 ) {
-    // 1) Creamos el VM pasando zoneId al constructor
+    // Creamos VM con el zoneId
     val vm: HistoryViewModel = viewModel(
-        factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
-                return HistoryViewModel(zoneId) as T
-            }
-        }
+        factory = HistoryViewModel.provideFactory(zoneId)
     )
 
-    // 2) Observamos la lista de lecturas
+    // Observamos Telemetry en lugar de Reading
     val data by vm.readings.collectAsState()
 
     Scaffold(
@@ -51,7 +46,6 @@ fun HistoryScreen(
         }
     ) { padding ->
         if (data.isEmpty()) {
-            // Cargando o sin datos
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -66,7 +60,6 @@ fun HistoryScreen(
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                // Gráfica de línea
                 AndroidView(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -77,11 +70,13 @@ fun HistoryScreen(
                             description = Description().apply { text = "" }
                             axisRight.isEnabled = false
                             legend.isEnabled = false
+                            isAutoScaleMinMaxEnabled = true
                         }
                     },
                     update = { chart ->
+                        // Ahora sí usamos correctamente humidity
                         val entries = data.mapIndexed { i, reading ->
-                            Entry(i.toFloat(), reading.humPct.toFloat())
+                            Entry(i.toFloat(), reading.humidity ?: 0f)
                         }
                         val set = LineDataSet(entries, "Humedad %").apply {
                             setDrawValues(false)
@@ -89,13 +84,14 @@ fun HistoryScreen(
                             colors = ColorTemplate.MATERIAL_COLORS.toList()
                         }
                         chart.data = LineData(set)
+                        chart.data.notifyDataChanged()
+                        chart.notifyDataSetChanged()
+                        chart.axisLeft.axisMinimum = 0f
+                        chart.axisLeft.axisMaximum = 100f
                         chart.invalidate()
                     }
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Botón para refrescar manualmente
+                Spacer(Modifier.height(8.dp))
                 Button(
                     onClick = { vm.refresh() },
                     modifier = Modifier.align(Alignment.CenterHorizontally)

@@ -129,6 +129,7 @@ fun AppNav(
             NewZoneScreen(
                 navController = nav,                 // único parámetro obligatorio
                 onSaved      = { nav.popBackStack() },
+                onBack  = { nav.popBackStack() },
                 onPickPlant  = { nav.navigate(Route.Plants.r) }
             )
         }
@@ -146,7 +147,10 @@ fun AppNav(
         }
 
         composable(Route.AddPlant.r) {
-            NewPlantScreen(onSaved = { nav.popBackStack() })
+            NewPlantScreen(
+                onSaved = { nav.popBackStack() },
+                onBack  = { nav.popBackStack() }  // 👈 esta línea permite que la flecha funcione
+            )
         }
 
         // AppNav.kt  – fragmento de la ruta detalle
@@ -167,10 +171,5 @@ fun AppNav(
                 onBack = { nav.popBackStack() }
             )
         }
-
-
-
-
-
     }
 }

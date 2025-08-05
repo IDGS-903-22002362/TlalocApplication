@@ -38,6 +38,17 @@ class ZonesViewModel(
             }
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /* ─────────── Zonas + humedad actual (para uso visual) ─────────── */
+    val zonesWithHumidity: StateFlow<List<ZoneWithHumidity>> =
+        combine(zones, zonesWithReading) { zonesList, readings ->
+            zonesList.map { zone ->
+                val telemetry = readings.find { it.first.id == zone.id }?.second
+                ZoneWithHumidity(zone, telemetry?.humidity?.toInt())
+
+            }
+        }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+
     /* ─────────── Zona seleccionada ─────────── */
 
     private val _selectedId = MutableStateFlow<String?>(null)
@@ -100,3 +111,7 @@ class ZonesViewModel(
     }
 
 }
+data class ZoneWithHumidity(
+    val zone: Zone,
+    val humidity: Int? // puede ser null si no hay lectura
+)
